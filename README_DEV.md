@@ -53,3 +53,21 @@ curl -s -X POST http://127.0.0.1:27182/v1/behavior/auto \
 curl -s -X POST http://127.0.0.1:27182/v1/settings/save -H 'Content-Type: application/json' -d '{}'
 curl -s -X POST http://127.0.0.1:27182/v1/settings/load -H 'Content-Type: application/json' -d '{}'
 ```
+
+
+## スモークテストスクリプト
+UnityアプリをPlay中（API起動済み）に実行します。
+
+### Bash
+```bash
+./scripts/api_smoke_test.sh
+# 任意指定
+BASE_URL=http://127.0.0.1:27182 MODEL_ID=Hiyori ./scripts/api_smoke_test.sh
+```
+
+### PowerShell
+```powershell
+./scripts/api_smoke_test.ps1
+# 任意指定
+./scripts/api_smoke_test.ps1 -BaseUrl "http://127.0.0.1:27182" -ModelId "Hiyori"
+```
