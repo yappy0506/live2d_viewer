@@ -92,12 +92,16 @@ namespace Live2DViewer
                 {
                     var payload = JsonUtility.FromJson<ModelSwitchRequest>(body);
                     if (payload == null || string.IsNullOrEmpty(payload.model_id)) { WriteError(ctx, 400, requestId, "E100", "invalid request"); return; }
-                    _dispatcher.Enqueue(() => _app.HandleModelSwitch(ctx, requestId, payload));
+                    if (!_app.HasModel(payload.model_id)) { WriteError(ctx, 200, requestId, "E110", "model not found"); return; }
+                    if (!_app.IsModelReady() && !payload.force) { WriteError(ctx, 200, requestId, "E409", "model is loading"); return; }
+                    _dispatcher.Enqueue(() => _app.SwitchModelOnMainThread(payload));
+                    WriteOk(ctx, requestId, new ModelSwitchStateResponse { state = "loading", model_id = payload.model_id });
                     return;
                 }
 
                 if (method == "POST" && path == "/v1/expression/apply")
                 {
+                    if (!_app.IsModelReady()) { WriteError(ctx, 200, requestId, "E409", "model not ready"); return; }
                     var payload = JsonUtility.FromJson<ExpressionApplyRequest>(body);
                     if (payload == null || string.IsNullOrEmpty(payload.expression_id)) { WriteError(ctx, 400, requestId, "E100", "invalid request"); return; }
                     _dispatcher.Enqueue(() => _app.HandleExpressionApply(ctx, requestId, payload));
@@ -106,6 +110,7 @@ namespace Live2DViewer
 
                 if (method == "POST" && path == "/v1/motion/play")
                 {
+                    if (!_app.IsModelReady()) { WriteError(ctx, 200, requestId, "E409", "model not ready"); return; }
                     var payload = JsonUtility.FromJson<MotionPlayRequest>(body);
                     if (payload == null || string.IsNullOrEmpty(payload.motion_id)) { WriteError(ctx, 400, requestId, "E100", "invalid request"); return; }
                     _dispatcher.Enqueue(() => _app.HandleMotionPlay(ctx, requestId, payload));
@@ -114,6 +119,7 @@ namespace Live2DViewer
 
                 if (method == "POST" && path == "/v1/motion/stop")
                 {
+                    if (!_app.IsModelReady()) { WriteError(ctx, 200, requestId, "E409", "model not ready"); return; }
                     _dispatcher.Enqueue(() => _app.HandleMotionStop(ctx, requestId));
                     return;
                 }
@@ -134,6 +140,7 @@ namespace Live2DViewer
 
                 if (method == "POST" && path == "/v1/window/overlay")
                 {
+                    if (!_app.IsModelReady()) { WriteError(ctx, 200, requestId, "E409", "model is loading"); return; }
                     var payload = JsonUtility.FromJson<OverlayRequest>(body);
                     _dispatcher.Enqueue(() => _app.HandleOverlay(ctx, requestId, payload));
                     return;
@@ -220,4 +227,5 @@ namespace Live2DViewer
     [Serializable] public class BehaviorAutoRequest { public bool blink = true; public bool breath = true; public float blink_gain = 1f; public float breath_gain = 1f; }
     [Serializable] public class TransformRequest { public float x; public float y; public float scale = 1f; public string framing = "full"; }
     [Serializable] public class OverlayRequest { public bool transparent = true; public string mode = "chromakey"; public bool always_on_top; public bool click_through; public float opacity = 1f; public string chromakey_color = "#00FF00"; }
+    [Serializable] public class ModelSwitchStateResponse { public string state; public string model_id; }
 }
