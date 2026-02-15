@@ -50,6 +50,11 @@ namespace Live2DViewer
 
         private void Update()
         {
+            if (_runtime == null)
+            {
+                return;
+            }
+
             _runtime.Tick();
         }
 

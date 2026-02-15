@@ -6,6 +6,7 @@ using Live2D.Cubism.Framework;
 using Live2D.Cubism.Framework.Expression;
 using Live2D.Cubism.Framework.Json;
 using Live2D.Cubism.Framework.Motion;
+using Live2D.Cubism.Framework.Physics;
 using UnityEngine;
 
 namespace Live2DViewer
@@ -62,6 +63,8 @@ namespace Live2DViewer
                 _expressionController = _root.GetComponent<CubismExpressionController>();
                 _motionController = _root.GetComponent<CubismMotionController>();
                 _autoBlink = _root.GetComponent<CubismAutoEyeBlinkInput>();
+
+                DisableUnsafePhysicsIfPresent();
 
                 BuildExpressionMap(modelJson, item.model3_path);
                 BuildMotionMap(modelJson, item.model3_path);
@@ -160,6 +163,23 @@ namespace Live2DViewer
             }
 
             return list;
+        }
+
+        private void DisableUnsafePhysicsIfPresent()
+        {
+            if (_root == null)
+            {
+                return;
+            }
+
+            var physics = _root.GetComponent<CubismPhysicsController>();
+            if (physics == null)
+            {
+                return;
+            }
+
+            physics.enabled = false;
+            _logger.Warn("CubismPhysicsController is disabled to avoid runtime NullReferenceException on some models.");
         }
 
         private void BuildExpressionMap(CubismModel3Json json, string model3Path)
