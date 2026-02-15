@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Diagnostics;
 using System.Threading;
 using UnityEngine;
 
@@ -47,7 +48,7 @@ namespace Live2DViewer
                 try
                 {
                     var ctx = _listener.GetContext();
-                    Handle(ctx);
+                    ThreadPool.QueueUserWorkItem(_ => Handle(ctx));
                 }
                 catch (Exception ex)
                 {
@@ -58,6 +59,7 @@ namespace Live2DViewer
 
         private void Handle(HttpListenerContext ctx)
         {
+            var sw = Stopwatch.StartNew();
             var req = ctx.Request;
             var path = req.Url?.AbsolutePath ?? "";
             var method = req.HttpMethod;
@@ -172,6 +174,14 @@ namespace Live2DViewer
             {
                 _logger.Error($"api error: {ex}");
                 WriteError(ctx, 500, requestId, "E500", "Internal Error");
+            }
+            finally
+            {
+                sw.Stop();
+                if (sw.ElapsedMilliseconds >= 1000)
+                {
+                    _logger.Warn($"slow request {method} {path} elapsed_ms={sw.ElapsedMilliseconds}");
+                }
             }
         }
 
