@@ -17,6 +17,8 @@ namespace Live2DViewer
         private OverlayController _overlay;
         private AppConfig _config;
         private List<ModelCatalogItem> _models = new List<ModelCatalogItem>();
+        private volatile bool _switchInProgress;
+        private string _pendingModelId = "";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Bootstrap()
@@ -67,6 +69,11 @@ namespace Live2DViewer
 
         public ModelStatusResponse GetModelStatus()
         {
+            if (_switchInProgress)
+            {
+                return new ModelStatusResponse { state = "loading", model_id = _pendingModelId, last_error = _runtime.LastError };
+            }
+
             return new ModelStatusResponse { state = _runtime.State, model_id = _runtime.CurrentModelId, last_error = _runtime.LastError };
         }
 
@@ -80,26 +87,50 @@ namespace Live2DViewer
             return new MotionsResponse { motions = _runtime.GetMotions().ToArray() };
         }
 
-        public bool IsModelReady() => _runtime.State == "ready";
+        public bool IsModelReady() => _runtime.State == "ready" && !_switchInProgress;
+
+        public bool HasModel(string modelId)
+        {
+            return _models.Any(x => x.model_id == modelId);
+        }
+
+        public void SwitchModelOnMainThread(ModelSwitchRequest req)
+        {
+            _switchInProgress = true;
+            _pendingModelId = req.model_id;
+            try
+            {
+                var item = _models.FirstOrDefault(x => x.model_id == req.model_id);
+                if (item == null)
+                {
+                    _logger.Warn($"model not found: {req.model_id}");
+                    return;
+                }
+
+                var ok = _runtime.SwitchModel(item, req.force);
+                if (!ok)
+                {
+                    _logger.Error($"model switch failed: {_runtime.LastError}");
+                    return;
+                }
+
+                _config.model_id = req.model_id;
+            }
+            finally
+            {
+                _switchInProgress = false;
+            }
+        }
 
         public void HandleModelSwitch(HttpListenerContext ctx, string requestId, ModelSwitchRequest req)
         {
-            var item = _models.FirstOrDefault(x => x.model_id == req.model_id);
-            if (item == null)
+            SwitchModelOnMainThread(req);
+            if (_runtime.State == "error")
             {
-                LocalApiServer.WriteError(ctx, 200, requestId, "E110", "model not found");
+                LocalApiServer.WriteError(ctx, 200, requestId, "E120", _runtime.LastError ?? "switch failed");
                 return;
             }
-
-            var ok = _runtime.SwitchModel(item, req.force);
-            if (!ok)
-            {
-                LocalApiServer.WriteError(ctx, 200, requestId, _runtime.State == "loading" ? "E409" : "E120", _runtime.LastError ?? "switch failed");
-                return;
-            }
-
-            _config.model_id = req.model_id;
-            LocalApiServer.WriteOk(ctx, requestId, new ModelSwitchResponse { state = "ready", model_id = req.model_id });
+            LocalApiServer.WriteOk(ctx, requestId, new ModelSwitchResponse { state = _runtime.State, model_id = _runtime.CurrentModelId });
         }
 
         public void HandleExpressionApply(HttpListenerContext ctx, string requestId, ExpressionApplyRequest req)
