@@ -142,7 +142,9 @@ namespace Live2DViewer
                 {
                     if (!_app.IsModelReady()) { WriteError(ctx, 200, requestId, "E409", "model is loading"); return; }
                     var payload = JsonUtility.FromJson<OverlayRequest>(body);
-                    _dispatcher.Enqueue(() => _app.HandleOverlay(ctx, requestId, payload));
+                    if (payload == null) { WriteError(ctx, 400, requestId, "E100", "invalid request"); return; }
+                    _dispatcher.Enqueue(() => _app.ApplyOverlayOnMainThread(payload));
+                    WriteOk(ctx, requestId, new OverlayEnqueuedResponse { accepted = true });
                     return;
                 }
 
@@ -228,4 +230,5 @@ namespace Live2DViewer
     [Serializable] public class TransformRequest { public float x; public float y; public float scale = 1f; public string framing = "full"; }
     [Serializable] public class OverlayRequest { public bool transparent = true; public string mode = "chromakey"; public bool always_on_top; public bool click_through; public float opacity = 1f; public string chromakey_color = "#00FF00"; }
     [Serializable] public class ModelSwitchStateResponse { public string state; public string model_id; }
+    [Serializable] public class OverlayEnqueuedResponse { public bool accepted; }
 }

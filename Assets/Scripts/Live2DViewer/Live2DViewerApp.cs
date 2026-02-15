@@ -179,7 +179,7 @@ namespace Live2DViewer
             LocalApiServer.WriteOk(ctx, requestId, _config.transform);
         }
 
-        public void HandleOverlay(HttpListenerContext ctx, string requestId, OverlayRequest req)
+        public void ApplyOverlayOnMainThread(OverlayRequest req)
         {
             _config.overlay = new OverlaySettings
             {
@@ -194,10 +194,13 @@ namespace Live2DViewer
             var r = _overlay.Apply(_config.overlay);
             if (!r.ok)
             {
-                LocalApiServer.WriteError(ctx, 200, requestId, r.errorCode, r.message);
-                return;
+                _logger.Warn($"overlay apply failed: {r.errorCode} {r.message}");
             }
+        }
 
+        public void HandleOverlay(HttpListenerContext ctx, string requestId, OverlayRequest req)
+        {
+            ApplyOverlayOnMainThread(req);
             LocalApiServer.WriteOk(ctx, requestId, _config.overlay);
         }
 
