@@ -2,8 +2,10 @@ param(
   [string]$BaseUrl = "http://127.0.0.1:27182",
   [string]$ModelId = "",
   [int]$RequestTimeoutSec = 15,
+  [int]$SwitchRequestTimeoutSec = 120,
   [int]$ModelReadyTimeoutSec = 60,
-  [switch]$ForceSwitch = $true
+  [switch]$ForceSwitch = $true,
+  [switch]$ContinueOnSwitchTimeout = $true
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,16 +14,16 @@ function Log($msg) {
   Write-Host "[$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')] $msg"
 }
 
-function Request-Json($Method, $Path, $Body = $null) {
+function Request-Json($Method, $Path, $Body = $null, $TimeoutSec = $RequestTimeoutSec) {
   $uri = "$BaseUrl$Path"
   try {
     if ($null -ne $Body) {
-      return Invoke-RestMethod -Method $Method -Uri $uri -ContentType "application/json" -Body $Body -TimeoutSec $RequestTimeoutSec
+      return Invoke-RestMethod -Method $Method -Uri $uri -ContentType "application/json" -Body $Body -TimeoutSec $TimeoutSec
     }
-    return Invoke-RestMethod -Method $Method -Uri $uri -TimeoutSec $RequestTimeoutSec
+    return Invoke-RestMethod -Method $Method -Uri $uri -TimeoutSec $TimeoutSec
   }
   catch {
-    throw "request timeout/error: $Method $Path (timeout=${RequestTimeoutSec}s). detail=$($_.Exception.Message)"
+    throw "request timeout/error: $Method $Path (timeout=${TimeoutSec}s). detail=$($_.Exception.Message)"
   }
 }
 
@@ -52,7 +54,7 @@ function Wait-ModelReady() {
   throw "model did not become ready within ${ModelReadyTimeoutSec}s"
 }
 
-Log "BASE_URL=$BaseUrl REQUEST_TIMEOUT=${RequestTimeoutSec}s MODEL_READY_TIMEOUT=${ModelReadyTimeoutSec}s"
+Log "BASE_URL=$BaseUrl REQUEST_TIMEOUT=${RequestTimeoutSec}s SWITCH_TIMEOUT=${SwitchRequestTimeoutSec}s MODEL_READY_TIMEOUT=${ModelReadyTimeoutSec}s"
 
 Log "1) health"
 $health = Request-Json GET "/v1/health"
@@ -68,8 +70,14 @@ if (-not $ModelId -and $models.data.models.Count -gt 0) {
 if ($ModelId) {
   Log "3) model/switch (ModelId=$ModelId)"
   $switchBody = @{ model_id = $ModelId; force = [bool]$ForceSwitch } | ConvertTo-Json -Compress
-  $switch = Request-Json POST "/v1/model/switch" $switchBody
-  Assert-Ok $switch "model/switch"
+  try {
+    $switch = Request-Json POST "/v1/model/switch" $switchBody $SwitchRequestTimeoutSec
+    Assert-Ok $switch "model/switch"
+  }
+  catch {
+    if (-not $ContinueOnSwitchTimeout) { throw }
+    Log "   WARN: model/switch がタイムアウトしました。model/status 監視を継続します。detail=$($_.Exception.Message)"
+  }
 
   Log "4) wait model ready"
   $status = Wait-ModelReady
