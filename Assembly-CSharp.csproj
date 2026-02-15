@@ -49,7 +49,16 @@
     <Analyzer Include="C:\Program Files\Unity\Hub\Editor\6000.3.8f1\Editor\Data\Tools\BuildPipeline\Unity.SourceGenerators\Unity.UIToolkit.SourceGenerator.dll" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Assets\Scripts\Live2DViewer\SettingsService.cs" />
+    <Compile Include="Assets\Scripts\Live2DViewer\LocalApiServer.cs" />
+    <Compile Include="Assets\Scripts\Live2DViewer\OverlayController.cs" />
+    <Compile Include="Assets\Scripts\Live2DViewer\AppLogger.cs" />
+    <Compile Include="Assets\Scripts\Live2DViewer\ModelCatalog.cs" />
     <Compile Include="Assets\TutorialInfo\Scripts\Readme.cs" />
+    <Compile Include="Assets\Scripts\Live2DViewer\AppModels.cs" />
+    <Compile Include="Assets\Scripts\Live2DViewer\MainThreadDispatcher.cs" />
+    <Compile Include="Assets\Scripts\Live2DViewer\Live2DViewerApp.cs" />
+    <Compile Include="Assets\Scripts\Live2DViewer\Live2DModelRuntime.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Assets\mcs.rsp" />
