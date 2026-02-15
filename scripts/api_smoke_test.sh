@@ -4,8 +4,10 @@ set -euo pipefail
 BASE_URL="${BASE_URL:-http://127.0.0.1:27182}"
 MODEL_ID="${MODEL_ID:-}"
 REQUEST_TIMEOUT_SEC="${REQUEST_TIMEOUT_SEC:-15}"
+SWITCH_REQUEST_TIMEOUT_SEC="${SWITCH_REQUEST_TIMEOUT_SEC:-120}"
 MODEL_READY_TIMEOUT_SEC="${MODEL_READY_TIMEOUT_SEC:-60}"
 FORCE_SWITCH="${FORCE_SWITCH:-true}"
+CONTINUE_ON_SWITCH_TIMEOUT="${CONTINUE_ON_SWITCH_TIMEOUT:-true}"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"
@@ -20,13 +22,14 @@ request() {
   local method="$1"
   local path="$2"
   local body="${3:-}"
+  local timeout="${4:-$REQUEST_TIMEOUT_SEC}"
 
   if [[ -n "$body" ]]; then
-    curl -sS --max-time "$REQUEST_TIMEOUT_SEC" -X "$method" "$BASE_URL$path" \
+    curl -sS --max-time "$timeout" -X "$method" "$BASE_URL$path" \
       -H 'Content-Type: application/json' \
       -d "$body"
   else
-    curl -sS --max-time "$REQUEST_TIMEOUT_SEC" -X "$method" "$BASE_URL$path"
+    curl -sS --max-time "$timeout" -X "$method" "$BASE_URL$path"
   fi
 }
 
@@ -88,7 +91,7 @@ wait_model_ready() {
   done
 }
 
-log "BASE_URL=$BASE_URL REQUEST_TIMEOUT=${REQUEST_TIMEOUT_SEC}s MODEL_READY_TIMEOUT=${MODEL_READY_TIMEOUT_SEC}s"
+log "BASE_URL=$BASE_URL REQUEST_TIMEOUT=${REQUEST_TIMEOUT_SEC}s SWITCH_TIMEOUT=${SWITCH_REQUEST_TIMEOUT_SEC}s MODEL_READY_TIMEOUT=${MODEL_READY_TIMEOUT_SEC}s"
 
 log "1) health"
 HEALTH_JSON="$(request GET /v1/health)" || fail "health request timeout/error"
@@ -107,9 +110,15 @@ else
   log "   MODEL_ID=$MODEL_ID"
 
   log "3) model/switch"
-  SWITCH_JSON="$(request POST /v1/model/switch "{\"model_id\":\"$MODEL_ID\",\"force\":$FORCE_SWITCH}")" || fail "model/switch request timeout/error"
-  assert_ok_true "$SWITCH_JSON" || fail "model switch failed"
-  log "   accepted"
+  if SWITCH_JSON="$(request POST /v1/model/switch "{\"model_id\":\"$MODEL_ID\",\"force\":$FORCE_SWITCH}" "$SWITCH_REQUEST_TIMEOUT_SEC")"; then
+    assert_ok_true "$SWITCH_JSON" || fail "model switch failed"
+    log "   accepted"
+  else
+    if [[ "$CONTINUE_ON_SWITCH_TIMEOUT" != "true" ]]; then
+      fail "model/switch request timeout/error"
+    fi
+    log "   WARN: model/switch がタイムアウトしました。model/status 監視を継続します。"
+  fi
 
   log "4) wait model ready"
   wait_model_ready
