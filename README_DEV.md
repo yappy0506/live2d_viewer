@@ -62,12 +62,17 @@ UnityアプリをPlay中（API起動済み）に実行します。
 ```bash
 ./scripts/api_smoke_test.sh
 # 任意指定
-BASE_URL=http://127.0.0.1:27182 MODEL_ID=Hiyori ./scripts/api_smoke_test.sh
+BASE_URL=http://127.0.0.1:27182 MODEL_ID=Hiyori REQUEST_TIMEOUT_SEC=15 MODEL_READY_TIMEOUT_SEC=60 FORCE_SWITCH=true ./scripts/api_smoke_test.sh
 ```
 
 ### PowerShell
 ```powershell
 ./scripts/api_smoke_test.ps1
 # 任意指定
-./scripts/api_smoke_test.ps1 -BaseUrl "http://127.0.0.1:27182" -ModelId "Hiyori"
+./scripts/api_smoke_test.ps1 -BaseUrl "http://127.0.0.1:27182" -ModelId "Hiyori" -RequestTimeoutSec 15 -ModelReadyTimeoutSec 60 -ForceSwitch
 ```
+
+
+### 補足: モデル切替時のハング対策
+- `model/switch` 実行時に応答が返らないケースに備え、両スクリプトはリクエストタイムアウトを持ちます。
+- また `model/status` をポーリングし、`ready` になるまで待機（上限時間あり）するため、途中停止原因を特定しやすくしています。
